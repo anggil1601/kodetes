@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kamera Realtime Cyberpunk</title>
+  <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+</head>
+<body>
+  <h1>Kamera Cyberpunk Realtime</h1>
+
+  <div id="roleSelection">
+    <button onclick="setRole('sender')">Sebagai Sender</button>
+    <button onclick="setRole('receiver')">Sebagai Receiver</button>
+  </div>
+
+  <div id="senderSection" style="display:none;">
+    <h2>Sender</h2>
+    <p>ID Kamu: <span id="senderId"></span></p>
+    <video id="senderVideo" autoplay playsinline muted></video>
+    <button onclick="stopCamera()">Matikan Kamera</button>
+  </div>
+
+  <div id="receiverSection" style="display:none;">
+    <h2>Receiver</h2>
+    <input type="text" id="peerIdInput" placeholder="Masukkan ID Sender" />
+    <button id="connectBtn" disabled>Connect</button>
+    <video id="receiverVideo" autoplay playsinline controls></video>
+  </div>
+
+  <script>
+    let peer;
+    let stream;
+
+    function setRole(role) {
+      document.getElementById('roleSelection').style.display = 'none';
+
+      if (role === 'sender') {
+        document.getElementById('senderSection').style.display = 'block';
+        peer = new Peer();
+
+        peer.on('open', (id) => {
+          document.getElementById('senderId').textContent = id;
+          console.log('Sender Peer ID:', id);
+        });
+
+        navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+          .then(s => {
+            stream = s;
+            document.getElementById('senderVideo').srcObject = stream;
+
+            peer.on('call', call => {
+              console.log('Menjawab panggilan dari receiver');
+              call.answer(stream);
+            });
+          })
+          .catch(err => {
+            alert('Gagal mengakses kamera: ' + err.message);
+          });
+
+      } else if (role === 'receiver') {
+        document.getElementById('receiverSection').style.display = 'block';
+
+        peer = new Peer();
+        peer.on('open', () => {
+          console.log('Receiver peer ready');
+          document.getElementById('connectBtn').disabled = false;
+        });
+
+        peer.on('error', (err) => {
+          console.error('Peer error:', err);
+        });
+      }
+    }
+
+    document.getElementById('connectBtn').addEventListener('click', () => {
+      const senderId = document.getElementById('peerIdInput').value.trim();
+      if (!senderId) {
+        alert('Masukkan ID Sender terlebih dahulu');
+        return;
+      }
+
+      console.log('Memanggil sender dengan ID:', senderId);
+      const call = peer.call(senderId, null);
+
+      call.on('stream', remoteStream => {
+        console.log('Stream diterima dari sender');
+        document.getElementById('receiverVideo').srcObject = remoteStream;
+      });
+
+      call.on('close', () => {
+        console.log('Call ditutup');
+      });
+
+      call.on('error', err => {
+        console.error('Call error:', err);
+      });
+    });
+
+    function stopCamera() {
+      if (stream) {
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+        document.getElementById('senderVideo').srcObject = null;
+        alert('Kamera dimatikan');
+      }
+    }
+  </script>
+</body>
+</html>
